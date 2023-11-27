@@ -19,7 +19,7 @@
 
 
 //servo
-Servo myServo;
+Servo myservo;
 int servoAngle=90;
 
 //lift fan
@@ -81,12 +81,13 @@ void loop() {
 
   
   yaw=-mpu.getAngleZ();
-  map(yaw,-180,180,0,180)    //mapping yaw ***check yaw range
+  map(yaw,-180,180,0,180);    //mapping yaw ***check yaw range
   servoAngle -= yaw;  //every loop will update the servo angle according to yaw  **check +-
   servoAngle=constrain(servoAngle,0,180);    //keeping it in servo range
 
   myservo.write(servoAngle);  //setting direction every loop
 
+  delay(100);
 
   digitalWrite(Tfan,HIGH);
   digitalWrite(Lfan,HIGH);
@@ -109,6 +110,7 @@ void loop() {
 
     digitalWrite(Lfan,HIGH);    //starts fans again once new angle is found
     digitalWrite(Tfan,HIGH);
+    hcStop=false;
   }
   
  
@@ -228,5 +230,3 @@ double USdist(){
   
   return distance;
 }
-
-
