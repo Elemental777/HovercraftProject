@@ -39,8 +39,13 @@ const float ACCELERATION_THRESHOLD = 0.1;  // Adjust as needed
 const int STOPPED_DURATION = 2000;         // Time in milliseconds to consider it stopped
 
 // Variables
-unsigned long stopStartTime = 0;
-bool hcStop =false;
+unsigned long stopStartTime = 0;  //timer in isHcStopped()
+int FanOnTime=2000;  //for delays
+int FanOffTime=2000;  //for delays
+
+//boolean logic
+bool firstLoop = true; //first loop bool to start fans
+bool hcStop =false;    //if hc stopped 
 
 
 //US global variables
@@ -65,11 +70,11 @@ void setup() {
   byte status = mpu.begin();
   Serial.print(F("MPU6050 status: "));
   Serial.println(status);
-  while (status != 0) { } // Stop if could not connect to MPU6050
+  while (status != 0) { } // stop if could not connect to MPU6050
 
   Serial.println(F("Calculating offsets, do not move MPU6050"));
   _delay_ms(1000);
-  mpu.calcOffsets(true, true); // Gyro and accelerometer
+  mpu.calcOffsets(true, true); // gyro and accelerometer offset calc.
   Serial.println("Done!\n");
   myservo.write(servoAngle);
   
@@ -79,7 +84,20 @@ void setup() {
 void loop() {
   mpu.update();
 
-  //add first loop bool
+  
+  //add first loop instructions
+  if(firstLoop){
+    
+    digitalWrite(Lfan,HIGH);
+    delay(FanOnTime);
+    
+  digitalWrite(Tfan,HIGH);
+ 
+    
+
+    
+  }
+  
   
   yaw=-mpu.getAngleZ();
   map(yaw,-180,180,0,180);    //mapping yaw ***check yaw range
@@ -118,34 +136,17 @@ void loop() {
   
   
   
-  /* mpu.update();
-
-  yaw = -mpu.getAngleZ();
-  Serial.print("Roll: ");
-  Serial.print(mpu.getAngleX());
-  Serial.print("\tACCELERO  X: ");
-  Serial.print(mpu.getAccX());
-  Serial.print("\tPitch: ");
-  Serial.print(mpu.getAngleY());
-  Serial.print("\tYaw: ");
-  Serial.println(yaw);
-  
-  map(yaw, 180, -180, 0, 180); // Modify servo angle as needed
-   myservo.write(90); // Update the servo angle
-   delay(3000);
-  myservo.write(sweep()); // Update the servo angle
-
-  delay(10000);
-  timer = millis();
-  */
+ 
 }
 
 
 //idea
-/* int getYaw(){
-  
+int getYaw(){
+  yaw =-mpu.getAngleZ();
+  map(yaw,-180,180,0,180); 
+  return 
 } 
-*/
+
 
 
 int sweep(){
