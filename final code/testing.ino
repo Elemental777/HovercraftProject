@@ -73,12 +73,13 @@ void setup() {
   Serial.println("Done!\n");
   myservo.write(servoAngle);
   
+  delay(1000);
 }
 
 void loop() {
   mpu.update();
 
-
+  //add first loop bool
   
   yaw=-mpu.getAngleZ();
   map(yaw,-180,180,0,180);    //mapping yaw ***check yaw range
