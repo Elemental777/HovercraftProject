@@ -88,49 +88,50 @@ void loop() {
   //add first loop instructions
   if(firstLoop){
     
-    digitalWrite(Lfan,HIGH);
+    digitalWrite(Lfan,HIGH);  //Lift Fan turns on first
     delay(FanOnTime);
     
-  digitalWrite(Tfan,HIGH);
- 
-    
+  digitalWrite(Tfan,HIGH);  //then thrust fan turns on once skirt is inflated
+
+  forwardYaw=getYaw();
+
+  firstLoop=false;
 
     
+  }else if(hcStop || isHcStopped()){    //to be reworked
+    
+    servoAngle=sweep();  //angle of servo to go in longest direction
+    myservo.write(servoAngle);  //updating new global servo direction after sweep
+    delay(300);
+
+    digitalWrite(Lfan,HIGH);    //starts fans again once new angle is found
+    delay(FanOnTime);
+    digitalWrite(Tfan,HIGH);
+    hcStop=false;
   }
   
-  
-  yaw=-mpu.getAngleZ();
-  map(yaw,-180,180,0,180);    //mapping yaw ***check yaw range
-  servoAngle -= yaw;  //every loop will update the servo angle according to yaw  **check +-
+  servoAngle -= forwardYaw;  //every loop will update the servo angle according to yaw  **check +-
   servoAngle=constrain(servoAngle,0,180);    //keeping it in servo range
 
   myservo.write(servoAngle);  //setting direction every loop
 
-  delay(100);
+  delay(1000);  //delay estimate for good servo adjustments every loop
 
-  digitalWrite(Tfan,HIGH);
-  digitalWrite(Lfan,HIGH);
+  
 
   
   if(incomingWall()){
   
   analogWrite(Lfan,100);
   digitalWrite(Tfan,LOW);
+  delay(FanOffTime);
     hcStop= true;    //global variable is false
   }
   
  
-  //to be reworked
-  if(hcStop|| isHcStopped()){
-    
-    servoAngle=sweep();  //angle of servo to go in longest direction
-    myservo.write(servoAngle);  //updating new global servo direction after sweep
-    delay(200);
-
-    digitalWrite(Lfan,HIGH);    //starts fans again once new angle is found
-    digitalWrite(Tfan,HIGH);
-    hcStop=false;
-  }
+  
+  
+ 
   
  
   
@@ -140,10 +141,10 @@ void loop() {
 }
 
 
-//idea
+//returning yaw value
 int getYaw(){
-  yaw =-mpu.getAngleZ();
-  map(yaw,-180,180,0,180); 
+  yaw =-mpu.getAngleZ();    //+- to be checked with servoangle+- yaw
+  map(yaw,-180,180,0,180);   //range to be checked 
   return 
 } 
 
