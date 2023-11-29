@@ -33,6 +33,7 @@ const int Tfan = 6; //p4
 MPU6050 mpu(Wire);
 unsigned long timer = 0;
 int forwardYaw;
+int currentYaw;
 float yaw;
 
 // Constants
@@ -41,7 +42,7 @@ const int STOPPED_DURATION = 2000;         // Time in milliseconds to consider i
 
 // Variables
 unsigned long stopStartTime = 0;  //timer in isHcStopped()
-int FanOnTime=2000;  //for delays
+int FanOnTime=3500;  //for delays
 int FanOffTime=2000;  //for delays
 
 //boolean logic
@@ -84,7 +85,7 @@ void setup() {
 
 void loop() {
   mpu.update();
-
+  currentYaw=getYaw();
   
   //add first loop instructions
   if(firstLoop){
@@ -93,28 +94,49 @@ void loop() {
     delay(FanOnTime);
     
   digitalWrite(Tfan,HIGH);  //then thrust fan turns on once skirt is inflated
-
-  forwardYaw=getYaw();
+  forwardYaw=currentYaw;
+  
 
   firstLoop=false;
-
-
     
+  }else if(hcStop){    //to be reworked
+    
+    servoAngle=sweep();  //angle of servo to go in longest direction
+    myservo.write(servoAngle);  //updating new global servo direction after sweep
+    delay(300);
+
+    digitalWrite(Lfan,HIGH);    //starts fans again once new angle is found
+    delay(FanOnTime);
+    digitalWrite(Tfan,HIGH);
+    delay(2000);
+    hcStop=false;
   }
   
   
-  servoAngle -= forwardYaw;  //every loop will update the servo angle according to yaw  **check +-
+  servoAngle = currentYaw + 90;  //every loop will update the servo angle according to yaw  **check +-
   servoAngle=constrain(servoAngle,0,180);    //keeping it in servo range
 
   myservo.write(servoAngle);  //setting direction every loop
 
-  delay(1000);
+  if(incomingWall()){
 
-  
+    analogWrite(Lfan,0);
+    digitalWrite(Tfan,LOW);
+    delay(FanOffTime);
+    hcStop= true;    //global variable is false
 
-  
- 
- 
+
+  }
+ delay(200);
+
+
+
+  Serial.print("yaw: ");
+  Serial.println(yaw);
+  Serial.print("forwardYaw: ");
+ Serial.println(forwardYaw);
+ Serial.print("currentYaw: ");
+ Serial.println(currentYaw);
  
   
  
@@ -127,12 +149,44 @@ void loop() {
 
 //idea
 int getYaw(){
-  yaw =-mpu.getAngleZ();
+  yaw =mpu.getAngleZ();
   map(yaw,-180,180,0,180); 
-  return yaw;
+  
+  
+ /* if(yaw<-90){
+    yaw=0;
+  }else if(yaw >90){
+    yaw=0;
+  }
+  */
+  return (yaw);  //check if difference is good
 } 
 
 
+
+void turnCW(){
+
+myservo.write(180);
+
+int currentYaw = forwardYaw;
+
+while(forwardYaw>(currentYaw+90)){
+  forwardYaw=getYaw();
+
+
+}
+
+myservo.write(forwardYaw);
+
+
+}
+
+
+void adjustments(){
+
+
+
+}
 
 int sweep(){
   bool firstDelay =true;
@@ -158,6 +212,8 @@ int sweep(){
     }
     
   }
+  forwardYaw=currentYaw + Theta;
+
   return Theta;
   
 }
@@ -191,7 +247,7 @@ bool isHcStopped(){
 
 bool incomingWall(){
 
-  if(USdist()<15){
+  if(USdist()<25){
     return true;
   }
   return false;
