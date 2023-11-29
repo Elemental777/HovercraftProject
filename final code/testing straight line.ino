@@ -32,6 +32,7 @@ const int Tfan = 6; //p4
 //MPU global variables
 MPU6050 mpu(Wire);
 unsigned long timer = 0;
+int forwardYaw;
 float yaw;
 
 // Constants
@@ -128,7 +129,7 @@ void loop() {
 int getYaw(){
   yaw =-mpu.getAngleZ();
   map(yaw,-180,180,0,180); 
-  return 
+  return yaw;
 } 
 
 
