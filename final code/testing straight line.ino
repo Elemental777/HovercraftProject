@@ -42,7 +42,7 @@ const int STOPPED_DURATION = 2000;         // Time in milliseconds to consider i
 
 // Variables
 unsigned long stopStartTime = 0;  //timer in isHcStopped()
-int FanOnTime=3500;  //for delays
+int FanOnTime=2000;  //for delays
 int FanOffTime=2000;  //for delays
 
 //boolean logic
@@ -85,7 +85,10 @@ void setup() {
 
 void loop() {
   mpu.update();
-  currentYaw=getYaw();
+  currentYaw=getYaw();    //set every loop
+  
+  
+  
   
   //add first loop instructions
   if(firstLoop){
@@ -95,20 +98,23 @@ void loop() {
     
   digitalWrite(Tfan,HIGH);  //then thrust fan turns on once skirt is inflated
   forwardYaw=currentYaw;
-  
-
   firstLoop=false;
     
   }else if(hcStop){    //to be reworked
     
-    servoAngle=sweep();  //angle of servo to go in longest direction
-    myservo.write(servoAngle);  //updating new global servo direction after sweep
-    delay(300);
+    //testing with recalibration when stopped
 
-    digitalWrite(Lfan,HIGH);    //starts fans again once new angle is found
-    delay(FanOnTime);
-    digitalWrite(Tfan,HIGH);
-    delay(2000);
+    mpu.calcOffsets(true, true);
+    delay(1000);
+
+
+    servoAngle=sweep();           //angle of servo to go in longest direction
+    myservo.write(servoAngle);    //updating new global servo direction after sweep
+    delay(300);
+    
+    digitalWrite(Lfan,HIGH);     //starts fans again once new angle is found
+    //delay(FanOnTime);
+    analogWrite(Tfan,255);
     hcStop=false;
   }
   
@@ -151,6 +157,7 @@ void loop() {
 int getYaw(){
   yaw =mpu.getAngleZ();
   map(yaw,-180,180,0,180); 
+ //yaw=yaw%360;
   
   
  /* if(yaw<-90){
@@ -212,7 +219,9 @@ int sweep(){
     }
     
   }
-  forwardYaw=currentYaw + Theta;
+ 
+ //forwardYaw=currentYaw + Theta -90;
+  //currentYaw=currentYaw + Theta -90;
 
   return Theta;
   
@@ -247,7 +256,7 @@ bool isHcStopped(){
 
 bool incomingWall(){
 
-  if(USdist()<25){
+  if(USdist()<50){
     return true;
   }
   return false;
