@@ -33,6 +33,7 @@ const int Tfan = 6; //p4
 MPU6050 mpu(Wire);
 unsigned long timer = 0;
 float yaw;
+int forwardYaw;
 
 // Constants
 const float ACCELERATION_THRESHOLD = 0.1;  // Adjust as needed
@@ -145,7 +146,7 @@ void loop() {
 int getYaw(){
   yaw =-mpu.getAngleZ();    //+- to be checked with servoangle+- yaw
   map(yaw,-180,180,0,180);   //range to be checked 
-  return 
+  return yaw;
 } 
 
 
