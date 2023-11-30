@@ -37,8 +37,8 @@ int currentYaw;
 float yaw;
 
 // Constants
-const float ACCELERATION_THRESHOLD = 0.1;  // Adjust as needed
-const int STOPPED_DURATION = 2000;         // Time in milliseconds to consider it stopped
+const float ACCELERATION_THRESHOLD = 0.3;  // Adjust as needed
+const int STOPPED_DURATION = 5000;         // Time in milliseconds to consider it stopped
 
 // Variables
 unsigned long stopStartTime = 0;  //timer in isHcStopped()
@@ -46,7 +46,7 @@ int FanOnTime=2000;  //for delays
 int FanOffTime=2000;  //for delays
 
 // //boolean logic
-// bool firstLoop = true; //first loop bool to start fans
+bool firstLoop = true; //first loop bool to start fans
 // bool hcStop =false;    //if hc stopped 
 bool sweepCheck=false;
 
@@ -56,6 +56,7 @@ long duration;
 double distance;
 long sweepTime;
 
+int TurnInArow=0;
 
 
 void setup() {
@@ -96,6 +97,13 @@ void loop() {
   currentYaw=getYaw();    //get the pointing direction.
   
   
+  if(firstLoop){
+
+    digitalWrite(Lfan,HIGH);  //Lift Fan turns on first
+    delay(1000);  
+    analogWrite(Tfan,255); 
+    firstLoop=false;
+  }
   
     
   // forward yaw - current yaw is the different from (-90 to currentyaw to +90 )
@@ -113,28 +121,23 @@ void loop() {
  
   myservo.write(servoAngle);  //setting direction every loop
   
-  if(servoAngle < 20 || servoAngle > 160)
-  {
+
+
+
+
+  if(abs(forwardYaw - currentYaw)>70){
     digitalWrite(Lfan,HIGH);  //Lift Fan turns on first
     //delay(FanOnTime);
-    analogWrite(Tfan,200);
+    analogWrite(Tfan,250);
     
   }
-  else if (servoAngle < 60 || servoAngle > 120)
-  {
+  else if (abs(forwardYaw - currentYaw)>45){
     digitalWrite(Lfan,HIGH);  //Lift Fan turns on first
     //delay(FanOnTime);  
     analogWrite(Tfan,200);  //then thrust fan turns on once skirt is inflated
     
-    if(incomingWall()){           //to fix
+  
 
-            
-                  //call stop 
-                  hcStop();   
-                }
-  
-  
-  
   }
   else{
 
@@ -156,24 +159,9 @@ void loop() {
 
   
    
-  if(abs(forwardYaw-currentYaw)<25){
-        
-    // digitalWrite(Lfan,HIGH);  //Lift Fan turns on first
-    // //delay(FanOnTime);  
-    // analogWrite(Tfan,100);  //then thrust fan turns on once skirt is inflated
-       
-        if(incomingWall()){           //to fix
-
-            
-                  //call stop 
-                  hcStop();   
-                }
-   }
-   //else{
-  //   digitalWrite(Lfan,HIGH);  //Lift Fan turns on first
-  //   //delay(FanOnTime);  
-  //   analogWrite(Tfan,255);  //then thrust fan turns on once skirt is inflated
-  // }
+  
+   
+  
  
 
 
@@ -195,7 +183,7 @@ void hcStop(){
     digitalWrite(Tfan,LOW);
     delay(FanOffTime);
     forwardYaw = currentYaw + sweep() -90;           //angle of servo to go in longest direction
-
+    firstLoop=true;
     
   }
 
@@ -244,13 +232,21 @@ sweepTime = millis();              //timer for checkwalltimer idea
  sweepCheck=true;                   //bool for checkwalltimer idea
   // return Theta - 90;
   
-  if(longestDist<1000){
-  if(Theta<60 ){
-    return 0;
+  
+  if(longestDist<1500){
+    if(Theta<75 ){
+      Theta = 0;
+    }
+    if(Theta> 105){
+      Theta = 180;
+    }
   }
-  if(Theta> 120){
-    return 180;
-  }
+  if(Theta==0 || Theta ==180){
+    if(check90Turn()){
+      return Theta;
+    }
+    return 90;
+
   }
   return Theta;
 }
@@ -280,6 +276,20 @@ bool isHcStopped(){
   return (stopStartTime != 0) && (millis() - stopStartTime >= STOPPED_DURATION);
 }
 
+
+bool check90Turn(){
+
+  if(TurnInArow>2){
+    TurnInArow=0;
+    return false;
+    }
+    else{
+    TurnInArow++;
+    return true;
+
+  }
+    
+}
 
 
 bool incomingWall(){
