@@ -32,8 +32,9 @@ const int Tfan = 6; //p4
 //MPU global variables
 MPU6050 mpu(Wire);
 unsigned long timer = 0;
-float yaw;
 int forwardYaw;
+int currentYaw;
+float yaw;
 
 // Constants
 const float ACCELERATION_THRESHOLD = 0.1;  // Adjust as needed
@@ -44,15 +45,16 @@ unsigned long stopStartTime = 0;  //timer in isHcStopped()
 int FanOnTime=2000;  //for delays
 int FanOffTime=2000;  //for delays
 
-//boolean logic
-bool firstLoop = true; //first loop bool to start fans
-bool hcStop =false;    //if hc stopped 
+// //boolean logic
+// bool firstLoop = true; //first loop bool to start fans
+// bool hcStop =false;    //if hc stopped 
+bool sweepCheck=false;
 
 
 //US global variables
 long duration;
 double distance;
-
+long sweepTime;
 
 
 
@@ -77,80 +79,141 @@ void setup() {
   _delay_ms(1000);
   mpu.calcOffsets(true, true); // gyro and accelerometer offset calc.
   Serial.println("Done!\n");
-  myservo.write(servoAngle);
+
+  //default servo to current 0  set forward to current.
+  myservo.write(currentYaw+90);
+  forwardYaw = currentYaw;
   
+
   delay(1000);
+ 
 }
 
 void loop() {
+
+
   mpu.update();
-
+  currentYaw=getYaw();    //get the pointing direction.
   
-  //add first loop instructions
-  if(firstLoop){
+  
+  
     
-    digitalWrite(Lfan,HIGH);  //Lift Fan turns on first
-    delay(FanOnTime);
+  // forward yaw - current yaw is the different from (-90 to currentyaw to +90 )
+  // +90 to convert to 0 to 180 degree.  90 is the currentYaw point. 
+  
+  servoAngle = forwardYaw - currentYaw +90;  //every loop will update the servo angle according to yaw  **check +-
+  //servoAngle = constrain(servoAngle,0,180);    //keeping it in servo range
+ if(servoAngle <0){
+    servoAngle=0;
     
-  digitalWrite(Tfan,HIGH);  //then thrust fan turns on once skirt is inflated
-
-  forwardYaw=getYaw();
-
-  firstLoop=false;
-
-    
-  }else if(hcStop || isHcStopped()){    //to be reworked
-    
-    servoAngle=sweep();  //angle of servo to go in longest direction
-    myservo.write(servoAngle);  //updating new global servo direction after sweep
-    delay(300);
-
-    digitalWrite(Lfan,HIGH);    //starts fans again once new angle is found
-    delay(FanOnTime);
-    digitalWrite(Tfan,HIGH);
-    hcStop=false;
   }
-  
-  servoAngle -= forwardYaw;  //every loop will update the servo angle according to yaw  **check +-
-  servoAngle=constrain(servoAngle,0,180);    //keeping it in servo range
-
+  if(servoAngle>180){
+    servoAngle=180;
+  }
+ 
   myservo.write(servoAngle);  //setting direction every loop
-
-  delay(1000);  //delay estimate for good servo adjustments every loop
-
   
-
-  
-  if(incomingWall()){
-  
-  analogWrite(Lfan,100);
-  digitalWrite(Tfan,LOW);
-  delay(FanOffTime);
-    hcStop= true;    //global variable is false
+  if(servoAngle < 20 || servoAngle > 160)
+  {
+    digitalWrite(Lfan,HIGH);  //Lift Fan turns on first
+    //delay(FanOnTime);
+    analogWrite(Tfan,200);
+    
   }
+  else if (servoAngle < 60 || servoAngle > 120)
+  {
+    digitalWrite(Lfan,HIGH);  //Lift Fan turns on first
+    //delay(FanOnTime);  
+    analogWrite(Tfan,200);  //then thrust fan turns on once skirt is inflated
+    
+    if(incomingWall()){           //to fix
+
+            
+                  //call stop 
+                  hcStop();   
+                }
   
+  
+  
+  }
+  else{
+
+    digitalWrite(Lfan,HIGH);  //Lift Fan turns on first
+    //delay(FanOnTime);  
+    analogWrite(Tfan,180); 
+
+      if(incomingWall()){           //to fix
+
+            
+                  //call stop 
+                  hcStop();   
+                }
+
+
+   
+  }
+
+
+  
+   
+  if(abs(forwardYaw-currentYaw)<25){
+        
+    // digitalWrite(Lfan,HIGH);  //Lift Fan turns on first
+    // //delay(FanOnTime);  
+    // analogWrite(Tfan,100);  //then thrust fan turns on once skirt is inflated
+       
+        if(incomingWall()){           //to fix
+
+            
+                  //call stop 
+                  hcStop();   
+                }
+   }
+   //else{
+  //   digitalWrite(Lfan,HIGH);  //Lift Fan turns on first
+  //   //delay(FanOnTime);  
+  //   analogWrite(Tfan,255);  //then thrust fan turns on once skirt is inflated
+  // }
  
-  
-  
- 
-  
- 
-  
-  
-  
- 
+
+
+//debug info
+Serial.print("yaw: ");
+Serial.println(yaw);
+Serial.print("forwardYaw: ");
+Serial.println(forwardYaw);
+Serial.print("currentYaw: ");
+Serial.println(currentYaw);
+
 }
 
+// stop and calaulate the next forwardYaw from (-90 current +90)
+void hcStop(){
+    
 
-//returning yaw value
+    analogWrite(Lfan,0);
+    digitalWrite(Tfan,LOW);
+    delay(FanOffTime);
+    forwardYaw = currentYaw + sweep() -90;           //angle of servo to go in longest direction
+
+    
+  }
+
+
+
+
+
+
+//get the current yaw?
 int getYaw(){
-  yaw =-mpu.getAngleZ();    //+- to be checked with servoangle+- yaw
-  map(yaw,-180,180,0,180);   //range to be checked 
-  return yaw;
+  yaw =-mpu.getAngleZ();
+ // map(yaw,-180,180,0,180); 
+ 
+  return (yaw);  //check if difference is good
 } 
 
 
-
+// do the sweep to find the next direction. return a angle that is -90 to +90 degree.
 int sweep(){
   bool firstDelay =true;
   int Theta = 0;
@@ -163,8 +226,9 @@ int sweep(){
       delay(200);
       firstDelay=false;
     }
-  delay(300);  // delays and degrees to be fine tuned 300 delay works
+  delay(500);  // delays and degrees to be fine tuned 300 delay works
     tempDist = USdist();
+  
     Serial.print("Servo angle:");
     Serial.println(i);
     
@@ -175,8 +239,20 @@ int sweep(){
     }
     
   }
-  return Theta;
+
+sweepTime = millis();              //timer for checkwalltimer idea
+ sweepCheck=true;                   //bool for checkwalltimer idea
+  // return Theta - 90;
   
+  if(longestDist<1000){
+  if(Theta<60 ){
+    return 0;
+  }
+  if(Theta> 120){
+    return 180;
+  }
+  }
+  return Theta;
 }
 
 bool isHcStopped(){
@@ -208,11 +284,13 @@ bool isHcStopped(){
 
 bool incomingWall(){
 
-  if(USdist()<15){
+  if(USdist()<50){
     return true;
   }
   return false;
 }
+
+
 
 double USdist(){
 
