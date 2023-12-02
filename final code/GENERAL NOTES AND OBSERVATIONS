@@ -1,0 +1,6 @@
+- when the hovercraft suddenly starts going backwards 
+its because of the thrust fan dropping too fast in speed from max throttle
+
+-isHcStopped() happens at the end of every loop and stops fans if it hasnt moved for 5s
+
+-
