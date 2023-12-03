@@ -183,6 +183,9 @@ void hcStop(){
     analogWrite(Lfan,0);
     digitalWrite(Tfan,LOW);
     delay(FanOffTime);
+  
+    currentYaw =getYaw();
+  
     forwardYaw = currentYaw + sweep() -90;           //angle of servo to go in longest direction
     firstLoop=true;
     
@@ -195,6 +198,7 @@ void hcStop(){
 
 //get the current yaw?
 int getYaw(){
+  mpu.update();
   yaw =-mpu.getAngleZ();
  // map(yaw,-180,180,0,180); 
  
