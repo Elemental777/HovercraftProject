@@ -92,8 +92,6 @@ void setup() {
 
 void loop() {
 
-
-  mpu.update();
   currentYaw=getYaw();    //get the pointing direction.
   
   
