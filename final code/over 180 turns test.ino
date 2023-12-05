@@ -20,7 +20,7 @@
 
 //servo
 Servo myservo;
-int servoAngle=90;
+int servoAngle;
 
 //lift fan
 //const int Lfan = 5; //p3 
@@ -33,7 +33,7 @@ const int Tfan = 6; //p4
 //MPU global variables
 MPU6050 mpu(Wire);
 unsigned long timer = 0;
-int forwardYaw;
+float forwardYaw;
 float currentYaw;
 float yaw;
 
@@ -48,7 +48,7 @@ int FanOffTime=2000;  //for delays
 float prevtA=3;
 
 // //boolean logic
-// bool firstLoop = true; //first loop bool to start fans
+ bool firstLoop = true; //first loop bool to start fans
 // bool hcStop =false;    //if hc stopped 
 bool sweepCheck=false;
 
@@ -83,7 +83,8 @@ void setup() {
   Serial.println("Done!\n");
 
   //default servo to current 0  set forward to current.
-  myservo.write(currentYaw+90);
+  myservo.write(90);
+  currentYaw=getYaw(); 
   forwardYaw = currentYaw;
   
   
@@ -94,8 +95,20 @@ void setup() {
 
 
 void loop() {
-  mpu.update();
-  
+
+if(firstLoop){
+
+digitalWrite(Lfan,HIGH);
+delay(500);
+analogWrite(Tfan,255);
+
+firstLoop=false;
+
+}
+
+
+  digitalWrite(Lfan,HIGH);
+
   currentYaw=getYaw();    //get the pointing direction.
   
   // forward yaw - current yaw is the different from (-90 to currentyaw to +90 )
@@ -112,23 +125,62 @@ void loop() {
   }
  
 myservo.write(servoAngle);  //setting direction every loop
-digitalWrite(Lfan,HIGH);
-  
-  
-  if(abs(forwardYaw-currentYaw)>50)
-  {
-    //delay(FanOnTime);
+
+  if(abs(forwardYaw-currentYaw)>60){
+
     analogWrite(Tfan,255);
+    if(turningWall())
+      hcStop();
+
+
+
+  }else if(abs(forwardYaw-currentYaw)<15){
+
+    analogWrite(Tfan,200);
+
+    if(incomingWall()){
+       hcStop();
+    }
+     
+
+
+
+  }else{
+      analogWrite(Tfan,180);
+      if(turningWall()){
+      hcStop();
+    }
+
   }
-  else if (abs(forwardYaw-currentYaw)>20)
-  {
-    //analogWrite(Lfan,255);
-    //delay(FanOnTime);  
-    analogWrite(Tfan,200);  //then thrust fan turns on once skirt is inflated  
-  }
-  else
+    
+  
+//   if(abs(forwardYaw-currentYaw)>50)
+//   {
+//     //delay(FanOnTime);
+//     analogWrite(Tfan,230);
+
+//     if(turningWall())
+//       hcStop();
+//   }
+//   else if (abs(forwardYaw-currentYaw)>20)
+//   {
+//     //analogWrite(Lfan,255);
+//     //delay(FanOnTime);  
+//     analogWrite(Tfan,180);  //then thrust fan turns on once skirt is inflated 
+//     if(turningWall())
+//       hcStop();
+//   }
+//   else{
+
+// analogWrite(Tfan, min(255,100+USdist())); 
+// if(incomingWall()){           //to fix 
+//         hcStop();   
+//         }
+
+
+//   }
     //analogWrite(Lfan, min(255,240+USdist()));
-    analogWrite(Tfan, min(255,100+USdist())); 
+    // analogWrite(Tfan, min(255,100+USdist())); 
     //delay(200);  
     // if((abs(forwardYaw-currentYaw)<5)){
     //    if(incomingWall()){           //to fix 
@@ -136,9 +188,9 @@ digitalWrite(Lfan,HIGH);
     //     }
     // }
     
-  if(incomingWall()){           //to fix 
-        hcStop();   
-        }
+  // if(incomingWall()){           //to fix 
+  //       hcStop();   
+  //       }
 
 
   //if(){
@@ -154,16 +206,16 @@ digitalWrite(Lfan,HIGH);
   //   analogWrite(Tfan,255);  //then thrust fan turns on once skirt is inflated
   // }
  
-if((millis() - accelTimer)> STOPPED_DURATION)
-  isHcStopped();
+// if((millis() - accelTimer)> STOPPED_DURATION)
+//   isHcStopped();
 
 //debug info
 // Serial.print("yaw: ");
 // Serial.println(yaw);
 // Serial.print("forwardYaw: ");
 // Serial.println(forwardYaw);
-Serial.print("currentYaw: ");
-Serial.println(currentYaw);
+// Serial.print("currentYaw: ");
+// Serial.println(currentYaw);
 
 }
 
@@ -171,12 +223,13 @@ Serial.println(currentYaw);
 // stop and calaulate the next forwardYaw from (-90 current +90)
 void hcStop(){
     
-    digitalWrite(Lfan,HIGH);
+    digitalWrite(Lfan,LOW);
     // delay(100);
     digitalWrite(Tfan,LOW);
-    // delay(FanOffTime);
+    delay(1000);
     forwardYaw = forwardYaw + sweep() - 90;           //angle of servo to go in longest direction
     accelTimer=millis();
+    firstLoop=true;
   }
 
 
@@ -184,6 +237,7 @@ void hcStop(){
 
 //get the current yaw?
 float getYaw(){
+  mpu.update();
   yaw =-mpu.getAngleZ();
  // map(yaw,-180,180,0,180); 
   return (yaw);  //check if difference is good
@@ -196,19 +250,19 @@ int sweep(){
   int Theta = 90;
   double tempDist = -10;
   double longestDist = -10;
-  for (int i=0; i<181; i+=30)
+  for (int i=0; i<181; i+=90)
   {
    
     myservo.write(i);
      if(firstDelay){    //adding delay for first servo movement to 0degrees
-      delay(200);
+      delay(300);
       firstDelay=false;
     }
-    delay(100);  // delays and degrees to be fine tuned 300 delay works
+    delay(300);  // delays and degrees to be fine tuned 300 delay works
     tempDist = USdist();
   
-    // Serial.print("Servo angle:");
-    // Serial.println(i);
+    Serial.print("Servo angle:");
+    Serial.println(i);
     
     if( tempDist > longestDist){
       longestDist = tempDist;  
@@ -282,11 +336,19 @@ void isHcStopped(){
 }
 
 
+bool turningWall(){
 
+if(USdist()<15){
+    return true;
+  }
+  return false;
+
+
+}
 
 bool incomingWall(){
 
-  if(USdist()<15){
+  if(USdist()<45){
     return true;
   }
   return false;
@@ -310,8 +372,8 @@ int USdist(){
   distance= duration*0.034/2;	//distance calc using 0.034cm/microsec
   
   
-  // Serial.print("Distance: ");
-  // Serial.println(distance);
+  Serial.print("Distance: ");
+  Serial.println(distance);
   
   return distance;
 }
