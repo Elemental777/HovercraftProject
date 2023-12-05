@@ -39,7 +39,7 @@ float yaw;
 
 // Constants
 const float ACCELERATION_THRESHOLD = 0.5;  // Adjust as needed
-const int STOPPED_DURATION = 6000;         // Time in milliseconds to consider it stopped
+const int STOPPED_DURATION = 9000;         // Time in milliseconds to consider it stopped
 
 // Variables
 unsigned long accelTimer = 0;  //timer in isHcStopped()
@@ -271,20 +271,42 @@ void isHcStopped(){
     
     digitalWrite(Lfan,LOW);
     analogWrite(Tfan,0);
-    delay(1000);
+    delay(800);
+    
+    //delay();
     digitalWrite(Lfan,HIGH);
-    //  delay(500);
+    delay(400);
+    analogWrite(Tfan,150);
+    // analogWrite(Tfan,150);
+    // delay(200);
+    int stuckTimer=millis();
+    while(millis()-stuckTimer<1500){
+         analogWrite(Tfan,255);
+         currentYaw=getYaw();    //get the pointing direction.
+  
+          servoAngle = forwardYaw - currentYaw + 90;  //every loop will update the servo angle according to yaw  **check +-
+        if(servoAngle < 0){
+            servoAngle = 0;
+          }
+          if(servoAngle > 180){
+            servoAngle = 180;
+          }
+        
+        myservo.write(servoAngle);  //setting direction every loop
+
+    }
+      
     // forwardYaw=getYaw();
      firstLoop=true;
-    prevtA = tA;
+    // prevtA = tA;
     // hcStop();  
-    accelTimer=millis();         
-    return;
+    // accelTimer=millis();         
+    // return;
      
   }
    
     prevtA = tA;
-
+    accelTimer=millis();
 
 }
 
