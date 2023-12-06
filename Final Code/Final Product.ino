@@ -12,45 +12,36 @@
 #define trigPin 11  //US trigger on PB3
 #define echoPin 2  //US echo on PD2
 
-//mpu
-#define YAW_THRESHOLD 90.0
-#define SERVO_MIN_ANGLE 0
-#define SERVO_MAX_ANGLE 180
-
-
 //servo
 Servo myservo;
 int servoAngle;
 
 //lift fan
-//const int Lfan = 5; //p3 
-const int Lfan=4; //DC pd4
+const int Lfan=4; //pd4 (DC)
 
 //thrust fan
-const int Tfan = 6; //p4
+const int Tfan = 6; //p4 (PWM)
 
 
 //MPU global variables
 MPU6050 mpu(Wire);
-unsigned long timer = 0;
-float forwardYaw;
-float currentYaw;
-float yaw;
+float forwardYaw;   //where we want to go
+float currentYaw;   //where we are pointing currently
+float yaw;         //yaw value
 
 // Constants
-const float ACCELERATION_THRESHOLD = 0.5;  // Adjust as needed
-const int STOPPED_DURATION = 9000;         // Time in milliseconds to consider it stopped
+const float ACCELERATION_THRESHOLD = 0.5;  //value to consider HoverCraft stopped
+
 
 // Variables
 unsigned long accelTimer = 0;  //timer in isHcStopped()
 int FanOnTime=2000;  //for delays
 int FanOffTime=2000;  //for delays
-float prevtA=3;
+float prevtA=3;  //first time calculating avg will use 3 as previous
 
 // //boolean logic
- bool firstLoop = true; //first loop bool to start fans
-// bool hcStop =false;    //if hc stopped 
-bool sweepCheck=false;
+bool firstLoop = true; //first loop bool to start fans
+
 
 
 //US global variables
@@ -61,41 +52,37 @@ unsigned long sweepTimer;
 
 
 void setup() {
-  
+  //setting pins to US sensor and fans
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
   pinMode(Lfan, OUTPUT);
   pinMode(Tfan, OUTPUT);
 
-  
+  //setting servo and IMU
   Serial.begin(9600);
   Wire.begin();
   myservo.attach(9);
 
   byte status = mpu.begin();
-  Serial.print(F("MPU6050 status: "));
-  Serial.println(status);
   while (status != 0) { } // stop if could not connect to MPU6050
 
-  Serial.println(F("Calculating offsets, do not move MPU6050"));
   _delay_ms(1000);
   mpu.calcOffsets(true, true); // gyro and accelerometer offset calc.
-  Serial.println("Done!\n");
+  
 
-  //default servo to current 0  set forward to current.
+  //default servo to 90 and set forward to current.
   myservo.write(90);
   currentYaw=getYaw(); 
   forwardYaw = currentYaw;
-  
-  
-
+ 
   delay(500);
- accelTimer=millis();
+  accelTimer=millis();
 }
 
 
 void loop() {
 
+//starting fans 
 if(firstLoop){
 
 digitalWrite(Lfan,HIGH);
@@ -106,76 +93,69 @@ firstLoop=false;
 
 }
 
-
-  digitalWrite(Lfan,HIGH);
+  
+  digitalWrite(Lfan,HIGH); //keeping lift fan on 
 
   currentYaw=getYaw();    //get the pointing direction.
   
   // forward yaw - current yaw is the different from (-90 to currentyaw to +90 )
-  // +90 to convert to 0 to 180 degree.  90 is the currentYaw point. 
-  
-  servoAngle = forwardYaw - currentYaw + 90;  //every loop will update the servo angle according to yaw  **check +-
-  //servoAngle = constrain(servoAngle,0,180);    //keeping it in servo range
+  servoAngle = forwardYaw - currentYaw + 90;  //every loop will update the servo angle according to yaw changes
+ 
+ //keeping it in servo range
  if(servoAngle < 0){
     servoAngle = 0;
-    
   }
   if(servoAngle > 180){
     servoAngle = 180;
   }
+
  
 myservo.write(servoAngle);  //setting direction every loop
 
+
+ //if hovercraft is doing a turn greater than 60 degrees full speed thrust
   if(abs(forwardYaw-currentYaw)>60){
 
     analogWrite(Tfan,255);
-    if(turningWall()&& (millis()-sweepTimer)>3000){
+    if(turningWall()&& (millis()-sweepTimer)>3000){   //avoid checking for walls for 3 sec from starting turn
       hcStop();
     }
       
 
 
 
-  }else if(abs(forwardYaw-currentYaw)<15){
+  }else if(abs(forwardYaw-currentYaw)<15){  //reduced thrust speed for straights
 
     analogWrite(Tfan,200);
 
-    if(incomingWall()&& (millis()-sweepTimer)>3000){
+    if(incomingWall()&& (millis()-sweepTimer)>3000){ //avoid checking for walls for 3 sec from starting turn
        hcStop();
     }
      
 
 
 
-  }else{
+  }else{    //thrust speed is lowest between 60 degree and 15 degree turns
       analogWrite(Tfan,180);
-      if(turningWall()&& (millis()-sweepTimer)>3000){
+      if(turningWall()&& (millis()-sweepTimer)>3000){  //avoid checking for walls for 3 sec from starting turn
       hcStop();
     }
 
   }
     
-if(millis()-accelTimer>6000)  {
-isHcStopped();
+ if(millis()-accelTimer>9000)  {   //checks accelerometers after 9 seconds of starting fans to check if the hovercraft is stuck not moving forward
+ isHcStopped();
+ 
+ }
 
-}
-
-// //debug info
-// Serial.print("yaw: ");
-// Serial.println(yaw);
-// Serial.print("forwardYaw: ");
-// Serial.println(forwardYaw);
-// Serial.print("currentYaw: ");
-// Serial.println(currentYaw);
 
 }
 
 
-// stop and calaulate the next forwardYaw from (-90 current +90)
+// stop and calculate the next desired direction to turn into
 void hcStop(){
     
     digitalWrite(Lfan,LOW);
-    // delay(100);
     digitalWrite(Tfan,LOW);
     delay(1000);
     forwardYaw = forwardYaw + sweep() - 90;           //angle of servo to go in longest direction
@@ -187,16 +167,16 @@ void hcStop(){
 
 
 
-//get the current yaw?
+//get the current yaw value
 float getYaw(){
   mpu.update();
   yaw =-mpu.getAngleZ();
- // map(yaw,-180,180,0,180); 
-  return (yaw);  //check if difference is good
+  return (yaw);  
 } 
 
 
-// do the sweep to find the next direction. return a angle that is -90 to +90 degree.
+//sweeping servo motor from 0 to 180 degrees checking for longest distance every 90 degrees
+//if the longest distance is less than 100 it means its a U turn so we return a -90 or 270 degree turn
 int sweep(){
   bool firstDelay =true;
   int Theta;
@@ -210,25 +190,18 @@ int sweep(){
       delay(300);
       firstDelay=false;
     }
-    delay(500);  // delays and degrees to be fine tuned 300 delay works
-    tempDist = USdist();
-  
-    // Serial.print("Servo angle:");
-    // Serial.println(i);
+    delay(500);  // delay for accurate readings
+    tempDist = USdist();  //get distance
     
-    if( tempDist > longestDist){
+    if( tempDist > longestDist){  //comparing present value with longest distance and setting them accordingly
       longestDist = tempDist;  
       Theta = i;
-        //check with yaw value 
-    }
+     }
     delay(100);
 
   }
 
-// sweepTime = millis();              //timer for checkwalltimer idea
-//  sweepCheck=true;                   //bool for checkwalltimer idea
-  // return Theta - 90;
-  
+ //checking for U turn
   if(longestDist<100){
         if(Theta < 90 ){
           Theta = -90;
@@ -237,7 +210,7 @@ int sweep(){
         if(Theta > 90){
           Theta = 270;
         }
-  }else{
+  }else{         //case of no U turn
           if(Theta < 90 ){
           Theta = 0;
         }
@@ -249,12 +222,13 @@ int sweep(){
     
   }
 
-  Serial.print(Theta);
+ 
   return Theta;
 }
 
 
-//this works
+//checking if acceleration magnitude average is less than 0.5 meaning we're at a constant speed, 
+//works after 9sec of starting to avoid stopping HC too soon if we reach a steady speed 
 void isHcStopped(){
    mpu.update();  // Update IMU data
   
@@ -267,19 +241,18 @@ void isHcStopped(){
   float avgA= (prevtA + tA)/2;
 
   // Check if the acceleration is below the threshold
-  if (avgA < ACCELERATION_THRESHOLD) {   //acceleration threshold is 0
+  if (avgA < ACCELERATION_THRESHOLD) {   //acceleration threshold is 0.5
     
-    digitalWrite(Lfan,LOW);
+    digitalWrite(Lfan,LOW);  //stopping and starting fans before returning to main loop
     analogWrite(Tfan,0);
     delay(800);
-    
-    //delay();
+ 
     digitalWrite(Lfan,HIGH);
     delay(400);
     analogWrite(Tfan,150);
-    // analogWrite(Tfan,150);
-    // delay(200);
     int stuckTimer=millis();
+
+   //keep going in same direction for 1.5 seconds
     while(millis()-stuckTimer<1500){
          analogWrite(Tfan,255);
          currentYaw=getYaw();    //get the pointing direction.
@@ -296,12 +269,7 @@ void isHcStopped(){
 
     }
       
-    // forwardYaw=getYaw();
-     firstLoop=true;
-    // prevtA = tA;
-    // hcStop();  
-    // accelTimer=millis();         
-    // return;
+   
      
   }
    
@@ -311,16 +279,17 @@ void isHcStopped(){
 }
 
 
+//check for distance smaller than 18 when turning
 bool turningWall(){
 
-if(USdist()<18){
-    return true;
-  }
-  return false;
-
-
+  if(USdist()<18){
+      return true;
+    }
+    return false;
 }
 
+
+//check for distance smaller than 30 when going straight
 bool incomingWall(){
 
   if(USdist()<30){
@@ -331,7 +300,7 @@ bool incomingWall(){
 }
 
 
-
+//get distance from Ultrasonic Sensor
 int USdist(){
 
   digitalWrite(trigPin, LOW); //clear trig
@@ -345,10 +314,6 @@ int USdist(){
   duration = pulseIn(echoPin, HIGH);	//read input echo
   
   distance= duration*0.034/2;	//distance calc using 0.034cm/microsec
-  
-  
-  // Serial.print("Distance: ");
-  // Serial.println(distance);
-  
+ 
   return distance;
 }
